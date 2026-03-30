@@ -1,9 +1,25 @@
 import os
 import json
 import subprocess
+import dotenv
+
+dotenv.load_dotenv()
+
+BASE_DIR = os.path.realpath(os.getcwd())
+
+
+def resolve_path(user_path: str) -> str:
+    full_path = os.path.join(BASE_DIR, user_path)
+    full_path = os.path.relpath(full_path)
+
+    if not full_path.startswith(BASE_DIR):
+        raise ValueError("Access outside working directory is not allowed")
+
+    return full_path
 
 
 def list_files(path: str) -> str:
+    path = resolve_path(path)
     try:
         return json.dumps({"files": os.listdir(path)})
     except Exception as e:
@@ -11,6 +27,7 @@ def list_files(path: str) -> str:
 
 
 def read_file(path: str) -> str:
+    path = resolve_path(path)
     try:
         if not os.path.isfile(path):
             return json.dumps({"error": "File not found"})
@@ -25,10 +42,11 @@ def read_file(path: str) -> str:
 
 
 def write_file(path: str, code: str) -> str:
+    path = resolve_path(path)
     try:
         dir = os.path.dirname(path)
         if dir:
-            os.makedirs(path, exist_ok=True)
+            os.makedirs(dir, exist_ok=True)
 
         if os.path.isdir(path):
             return json.dumps({"error": "Cant write in a directory."})

@@ -10,17 +10,20 @@ BASE_DIR = os.path.realpath(os.getcwd())
 
 
 def resolve_path(user_path: str) -> str:
+    if not user_path or user_path.strip() == ".":
+        return BASE_DIR
+    
     full_path = os.path.join(BASE_DIR, user_path)
-    full_path = os.path.relpath(full_path)
+    full_path = os.path.abspath(full_path)
 
-    if not full_path.startswith(BASE_DIR + os.sep):
+    if not full_path.startswith(BASE_DIR + os.sep) and full_path != BASE_DIR:
         raise ValueError("Access outside working directory is not allowed")
 
     return full_path
 
 
 @tool
-def list_files(path: str) -> str:
+def list_files(path: str = ".") -> str:
     """List files in a directory."""
     path = resolve_path(path)
     try:
@@ -68,7 +71,7 @@ def write_file(path: str, code: str) -> str:
 
 
 @tool
-def run_python(code):
+def run_python(code: str) -> str:
     """Run python code."""
     try:
         result = subprocess.run(

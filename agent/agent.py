@@ -3,10 +3,9 @@ from dotenv import load_dotenv
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 from langchain_openai import ChatOpenAI  
-from .utils.nodes import make_agent_node
 
 from .utils.state import AgentState
-from .utils.nodes import agent_node, tool_node
+from .utils.nodes import make_agent_node, tool_node
 from .utils.tools import tools
 
 load_dotenv()
@@ -37,5 +36,6 @@ graph.add_conditional_edges(
     ["tools", END]
 )
 graph.add_edge("tools", "agent")
+
 
 app = graph.compile()

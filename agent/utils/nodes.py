@@ -5,14 +5,6 @@ from .tools import tools
 
 tool_node = ToolNode(tools=tools)
 
-def agent_node(state: AgentState, config) -> AgentState:
-    model = config["configurable"]["model"]
-    model_with_tools = model.bind_tools(tools)
-    
-    response = model_with_tools.invoke(state["messages"])
-    return {"messages": [response]}
-
-
 def make_agent_node(model):
     def agent_node(state: AgentState) -> AgentState:
         model_with_tools = model.bind_tools(tools)

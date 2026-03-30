@@ -3,13 +3,19 @@ from langchain_core.messages import HumanMessage
 from agent.agent import model
 
 if __name__ == "__main__":
-    result = app.invoke(
-        {"messages": [HumanMessage(content="Write a function that reverses a string and test it with 'hello world'.")]},
-        config={
-            "configurable": {
-                "model": model
-            }
-        }
-    )
-    print(result["messages"][-1].content)
-    
+    print("Coding Agent Ready! (Type 'exit' to stop)\n")
+
+    while True:
+        user_input = input("User: ").strip()
+        if user_input.lower() == "exit":
+            break
+        if not user_input:
+            continue
+
+        print("Thinking...\n")
+
+        result = app.invoke(
+            {"messages": [HumanMessage(content=user_input)]}
+        )
+        print(result["messages"][-1].content)
+        print("\n" + "=" * 60 + "\n")

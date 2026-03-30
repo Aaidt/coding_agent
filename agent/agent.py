@@ -3,8 +3,6 @@ from dotenv import load_dotenv
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 from langchain_openai import ChatOpenAI  
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.checkpoint.sqlite import SqliteSaver
 
 from .utils.state import AgentState
 from .utils.nodes import make_agent_node, tool_node
@@ -15,7 +13,7 @@ load_dotenv()
 model = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY"),
-    model="nvidia/nemotron-3-super-120b-a12b:free",    
+    model="openrouter/free",    
     temperature=0.2
 )
 
@@ -25,18 +23,17 @@ def should_continue(state: AgentState) -> str:
         return "tools"
     return END
 
+def graph_builder():
+    graph = StateGraph(AgentState)
 
-graph = StateGraph(AgentState)
+    graph.add_node("agent", make_agent_node(model))
+    graph.add_node("tools", tool_node)
 
-graph.add_node("agent", make_agent_node(model))
-graph.add_node("tools", tool_node)
-
-graph.add_edge(START, "agent")
-graph.add_conditional_edges(
-    "agent",
-    should_continue,
-    ["tools", END]
-)
-graph.add_edge("tools", "agent")
-
-app = graph.compile(checkpointer=SqliteSaver.from_conn_string("sqlite:///checkpoints.db"))  
+    graph.add_edge(START, "agent")
+    graph.add_conditional_edges(
+        "agent",
+        should_continue,
+        {"tools": "tools", END: END}    
+    )
+    graph.add_edge("tools", "agent")
+    return graph

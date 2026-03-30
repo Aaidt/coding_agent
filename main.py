@@ -1,6 +1,8 @@
-from agent.agent import app
 from langchain_core.messages import HumanMessage
 from agent.agent import model
+from agent.agent import graph_builder
+from langgraph.checkpoint.sqlite import SqliteSaver
+import os
 
 if __name__ == "__main__":
     print("🤖 Coding Agent Ready! (Type 'exit' to stop)\n")
@@ -16,15 +18,11 @@ if __name__ == "__main__":
             break
 
         if choice == "1":
-            # Start a brand new thread
-            thread_id = f"chat-{os.urandom(4).hex()}"   # random unique id
+            thread_id = f"chat-{os.urandom(4).hex()}"  
             print(f"\n🆕 Starting NEW chat → {thread_id}")
         
         elif choice == "2":
-            # List all saved threads (simple way)
             print("\nSaved chats:")
-            # We can list them from the database later if you want fancy names
-            # For now we show raw thread_ids
             print("→ Checkpoints are saved in 'checkpoints.db'")
             thread_id = input("Paste thread_id to resume (or press Enter for new): ").strip()
             if not thread_id:
@@ -44,36 +42,36 @@ if __name__ == "__main__":
             if not user_query:
                 continue
 
-            print("\nThinking...\n")
+            graph = graph_builder()
+            checkpointer = SqliteSaver.from_conn_string("checkpoints.db")
 
-            # STREAM MODE → shows reasoning live!
-            config = {
-                "configurable": {
-                    "thread_id": thread_id,
-                    "model": llm
+            with checkpointer as saver:
+                app = graph.compile(checkpointer=saver) 
+                
+                print("\nThinking...\n")
+
+                config = {
+                    "configurable": { "thread_id": thread_id }
                 }
-            }
 
-            # This is the key part for seeing reasoning
-            for event in coding_agent.stream(
-                {"messages": [HumanMessage(content=user_query)]},
-                config,
-                stream_mode="updates"   # shows every node update
-            ):
-                # Print whatever the agent does
-                if "agent" in event:
-                    msg = event["agent"]["messages"][-1]
-                    if msg.content:
-                        print(f"🧠 Agent thought: {msg.content}")
-                    if hasattr(msg, "tool_calls") and msg.tool_calls:
-                        for tc in msg.tool_calls:
-                            print(f"🔧 Calling tool: {tc['name']}({tc['args']})")
-            
-                elif "tools" in event:
-                    tool_output = event["tools"]["messages"][-1]
-                    print(f"🛠️  Tool result: {tool_output.content[:500]}...")
+                for event in app.stream(
+                    {"messages": [HumanMessage(content=user_query)]},
+                    config,
+                    stream_mode="updates"  
+                ):
+                    if "agent" in event:
+                        msg = event["agent"]["messages"][-1]
+                        if msg.content:
+                            print(f"🧠 Agent thought: {msg.content}")
+                        if hasattr(msg, "tool_calls") and msg.tool_calls:
+                            for tc in msg.tool_calls:
+                                print(f"🔧 Calling tool: {tc['name']}({tc['args']})")
 
-            # Print final answer cleanly
-            final_state = coding_agent.get_state(config)
-            final_msg = final_state.values["messages"][-1]
-            print(f"\n✅ Final Answer:\n{final_msg.content}\n")
+                    elif "tools" in event:
+                        tool_output = event["tools"]["messages"][-1]
+                        print(f"🛠️  Tool result: {tool_output.content[:500]}...")
+
+
+                final_state = app.get_state(config)
+                final_msg = final_state.values["messages"][-1]
+                print(f"\n✅ Final Answer:\n{final_msg.content}\n")

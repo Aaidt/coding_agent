@@ -21,6 +21,7 @@ def resolve_path(user_path: str) -> str:
 
 @tool
 def list_files(path: str) -> str:
+    """List files in a directory."""
     path = resolve_path(path)
     try:
         return json.dumps({"files": os.listdir(path)})
@@ -30,6 +31,7 @@ def list_files(path: str) -> str:
 
 @tool
 def read_file(path: str) -> str:
+    """Read a file."""
     path = resolve_path(path)
     try:
         if not os.path.isfile(path):
@@ -46,6 +48,7 @@ def read_file(path: str) -> str:
 
 @tool
 def write_file(path: str, code: str) -> str:
+    """Write a file."""
     path = resolve_path(path)
     try:
         dir = os.path.dirname(path)
@@ -66,6 +69,7 @@ def write_file(path: str, code: str) -> str:
 
 @tool
 def run_python(code):
+    """Run python code."""
     try:
         result = subprocess.run(
             ["python3", "-c", code],

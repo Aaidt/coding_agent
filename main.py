@@ -1,5 +1,4 @@
 from langchain_core.messages import HumanMessage
-from agent.agent import model
 from agent.agent import graph_builder
 from langgraph.checkpoint.sqlite import SqliteSaver
 import os

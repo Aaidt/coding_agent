@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, Button, Static, Label
+from textual.widgets import Footer, Input, Button, Static, Label, Markdown
 from textual.containers import Vertical, Horizontal, Container
 from textual.reactive import reactive
 from langchain_core.messages import HumanMessage
@@ -16,70 +16,103 @@ class CodingAgentTUI(App):
     CSS = """
     Screen {
         layout: horizontal;
+        background: black;
     }
     
-    #left-pane {
+    #chat-pane {
         width: 1fr;
         height: 100%;
-        border: solid $secondary;
+        border: none;
         padding: 1;
+        background: transparent;
     }
 
-    #right-pane {
+    #control-pane {
         width: 1fr;
         height: 100%;
-        border: solid $accent;
+        border-left: solid rgba(255,255,255,0.2);
         padding: 1;
+        background: transparent;
     }
     
     #chat-container {
         height: 1fr;
         overflow-y: auto;
-        border: round $primary;
+        border: none;
         margin-bottom: 1;
+        background: transparent;
     }
 
     #agent-logs {
         height: 1fr;
         overflow-y: auto;
-        border: dashed $warning;
+        border: none;
         margin-top: 1;
+        background: transparent;
     }
     
     .title {
         text-align: center;
         text-style: bold;
-        background: $boost;
+        background: transparent;
+        color: orange;
         padding: 1;
         margin-bottom: 1;
     }
     
     .message {
         margin: 1 0;
+        width: 100%;
+        height: auto;
     }
     .user-message {
-        color: $success;
+        color: white;
+        text-style: bold;
     }
     .agent-message {
-        color: $primary;
+        color: orange;
     }
     .tool-message {
-        color: $warning;
+        color: #888888;
     }
     
     #controls {
         height: auto;
-        align:center middle;
+        align: center middle;
     }
     
     #status {
         text-align: center;
-        color: $text-muted;
+        color: white;
         margin: 1;
+    }
+
+    Button {
+        background: white;
+        color: black;
+        border: round;
+        padding: 0 0;
+        margin: 0 1;
+    }
+    
+    Button:hover {
+        color: white;
+        background: orange;
+        border: round;
+    }
+
+    Input {
+        background: #111111;
+        color: white;
+        border: round;
+        padding: 0 1;
+        margin-top: 1;
+    }
+    Input:focus {
+        border: round;
     }
     """
 
-    title = "OpenCode TUI mode"
     current_thread_id = reactive("")
 
     def __init__(self):
@@ -87,17 +120,13 @@ class CodingAgentTUI(App):
         self.graph_app = None 
 
     def compose(self) -> ComposeResult:
-        yield Header()
-        
         with Horizontal():
-            # Left side for Chat
-            with Vertical(id="left-pane"):
+            with Vertical(id="chat-pane"):
                 yield Label("💬 Chat", classes="title")
                 yield Vertical(id="chat-container")
                 yield Input(placeholder="Ask OpenCode a programming task...", id="user_input")
                 
-            # Right side for Controls & Logs
-            with Vertical(id="right-pane"):
+            with Vertical(id="control-pane"):
                 yield Label("⚙️ Control Panel", classes="title")
                 with Horizontal(id="controls"):
                     yield Button("New Chat", id="new_chat", variant="primary")
@@ -146,7 +175,6 @@ class CodingAgentTUI(App):
         
         event.input.clear()
 
-        # Fix here: Added () to graph_builder to call it properly
         async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
             self.graph_app = graph_builder().compile(checkpointer=checkpointer)
 
@@ -171,13 +199,12 @@ class CodingAgentTUI(App):
                     if "agent" in chunk:
                         msg = chunk["agent"]["messages"][-1]
                         if msg.content:
-                            chat_container.mount(Label(f"🤖 Agent: {msg.content}", classes="agent-message message"))
+                            # Use Markdown widget for better output rendering and legibility
+                            chat_container.mount(Markdown(f"🤖 **Agent:**\n{msg.content}", classes="agent-message message"))
                             logs_container.mount(Label("Agent returned a response.", classes="message"))
                             chat_container.scroll_end()
                     elif "tools" in chunk:
                         tool_msg = chunk["tools"]["messages"][-1]
-                        # Handling the tool call attribute format correctly
-                        # Sometimes tool content can be a string, sometimes empty if multiple things failed
                         content_str = str(tool_msg.content)[:150]
                         logs_container.mount(Label(f"🔧 Tool Output ({tool_msg.name}): {content_str}...", classes="tool-message message"))
                         logs_container.scroll_end()
@@ -188,7 +215,18 @@ class CodingAgentTUI(App):
                 return
 
             status.update("✅ Done thinking.")
-            chat_container.scroll_end()
+            
+            # Print state one more time at the end to ensure the user gets the final output if astream updates missed it
+            # This fetches the final state payload directly from LangGraph
+            try:
+                final_state = await self.graph_app.aget_state(config)
+                final_msg = final_state.values.get("messages", [])[-1]
+                if "agent" not in chunk: # If the last chunk wasn't the agent message
+                    chat_container.mount(Markdown(f"🤖 **Final Output:**\n{final_msg.content}", classes="agent-message message"))
+            except Exception:
+                pass
+
+                chat_container.scroll_end()
             logs_container.scroll_end()
 
     def list_saved_chats(self):

@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 from langchain_openai import ChatOpenAI  
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 
 from .utils.state import AgentState
 from .utils.nodes import make_agent_node, tool_node
@@ -37,5 +39,4 @@ graph.add_conditional_edges(
 )
 graph.add_edge("tools", "agent")
 
-
-app = graph.compile()
+app = graph.compile(checkpointer=SqliteSaver.from_conn_string("sqlite:///checkpoints.db"))  
